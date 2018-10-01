@@ -1,25 +1,114 @@
----
+
+```{r }
 title: "Reproducible Research: Peer Assessment 1"
 output: 
   html_document:
     keep_md: true
----
+```{r }
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, results = TRUE)
+library(dplyr)
+library(lubridate)
+library(chron)
+library(ggplot2)
+```
 
 ## Loading and preprocessing the data
 
-
+```{r 1. Code for reading in the dataset and/or processing the data}
+dataFileName<-"activity.csv"
+zipFileName<-"Activity monitoring data.zip"
+fileUrl<-"https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+if (!(file.exists(dataFileName))){
+        download.file(fileUrl,zipFileName)
+        unzip(zipFileName,exdir=getwd())
+    }
+if (file.exists(zipFileName)) file.remove(zipFileName)
+activity<-read.csv(dataFileName)
+```
 
 ## What is mean total number of steps taken per day?
 
+### Daily Step Count Histogram
 
+```{r 2. Histogram of the total number of steps taken each day}
+knitr::fig_path('figures/')
+dailySteps<-aggregate(activity[,1],list(activity$date),sum)
+hist(dailySteps$x,xlab="Daily Step Cout",main="")
+```
+
+### Daily Steps Mean and Median
+
+```{r 3. Mean and median number of steps taken each day}
+c(mean=mean(dailySteps$x,na.rm=TRUE), median=median(dailySteps$x,na.rm=TRUE))
+```
 
 ## What is the average daily activity pattern?
 
+### Average Steps Taken at Each Time Interval
+```{r 4. Time series plot of the average number of steps taken}
+IntervalAverageSteps<-aggregate(activity[,1],list(activity$interval),FUN=mean,
+                               na.rm=TRUE, na.action=NULL)
+names(IntervalAverageSteps)<-c("Interval","Average Steps")
+plot(IntervalAverageSteps$Interval, IntervalAverageSteps$`Average Steps`,type="l")
+```
 
+### Most Active Iterval
 
-## Imputing missing values
+```{r 5. The 5-minute interval that, on average, contains the maximum number of steps}
+IntervalAverageSteps[IntervalAverageSteps$`Average Steps`==max(IntervalAverageSteps$`Average Steps`),1]
+```
 
+## Inputing missing values
 
+```{r 6. Code to describe and show a strategy for inputing missing data}
+#replace NA
+activity<-split(activity,is.na(activity$steps))
+matchIntervals<-match(activity$`TRUE`$interval,IntervalAverageSteps$Interval)
+activity$`TRUE`$steps<-IntervalAverageSteps$`Average Steps`[matchIntervals]
+activity<-rbind(activity$`FALSE`,activity$`TRUE`)
+```
+
+### Daily Step Count Histogram After Replacing Missing Values for averages
+
+```{r 7. Histogram of the total number of steps taken each day after missing values are imputed}
+dailySteps<-aggregate(activity[,1],list(activity$date),sum)
+hist(dailySteps$x)
+```
+
+### Daily Steps Mean and Median After Replacing Missing Values for averages
+
+```{r 7.1 Mean and median number of steps taken each day after missing values are imputed}
+c(mean=mean(dailySteps$x,na.rm=TRUE), median=median(dailySteps$x,na.rm=TRUE))
+```
+
+After repacing the missing values for the mean the mean value does not change, as expected. The median however ir closer to the mean now.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r 8. Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends}
+
+# Add column to determine weekday
+
+activity<-cbind(activity,weekend=is.weekend(activity$date))
+
+
+#Calculate averages for each interval and each weekday type
+
+IntervalWeekdayMeanSteps<-aggregate(activity[,1],list(activity$interval,activity$weekend),FUN=mean,
+                               na.rm=TRUE, na.action=NULL)
+names(IntervalWeekdayMeanSteps)<-c("Interval","Weekday","Steps")
+IntervalWeekdayMeanSteps$Weekday<-as.factor(IntervalWeekdayMeanSteps$Weekday)
+levels(IntervalWeekdayMeanSteps$Weekday)<-c("Weekday","Weekend")
+names(IntervalWeekdayMeanSteps)<-c("Interval","Weekday","Steps")
+
+# Plot the result
+
+qplot(Interval,Steps, data=IntervalWeekdayMeanSteps,color=Weekday)+stat_smooth(aes(x = Interval, y = Steps), method = "lm",
+              formula = y ~ poly(x, 20), se = FALSE)
+
+```
+```
+```
+
